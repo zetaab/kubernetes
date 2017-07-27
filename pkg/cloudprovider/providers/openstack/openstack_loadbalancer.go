@@ -598,6 +598,17 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
+	floatingPool := ""
+	for key, value := range apiService.ObjectMeta.Labels {
+		if key == "floatingPool" {
+			floatingPool = value
+		}
+	}
+	if floatingPool == "" {
+		floatingPool = lbaas.opts.FloatingNetworkId
+	}
+	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
+
 	ports := apiService.Spec.Ports
 	if len(ports) == 0 {
 		return nil, fmt.Errorf("no ports provided to openstack load balancer")
@@ -828,10 +839,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	if err != nil && err != ErrNotFound {
 		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
-	if floatIP == nil && lbaas.opts.FloatingNetworkId != "" {
+	if floatIP == nil && floatingPool != "" {
 		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
 		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lbaas.opts.FloatingNetworkId,
+			FloatingNetworkID: floatingPool,
 			PortID:            portID,
 		}
 		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
