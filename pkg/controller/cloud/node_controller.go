@@ -45,11 +45,17 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
-var UpdateNodeSpecBackoff = wait.Backoff{
-	Steps:    20,
-	Duration: 50 * time.Millisecond,
-	Jitter:   1.0,
-}
+var (
+	UpdateNodeSpecBackoff = wait.Backoff{
+		Steps:    20,
+		Duration: 50 * time.Millisecond,
+		Jitter:   1.0}
+
+	ShutDownTaint = &v1.Taint{
+		Key:    algorithm.TaintNodeShutdown,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+)
 
 type CloudNodeController struct {
 	nodeInformer coreinformers.NodeInformer
@@ -254,6 +260,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 				// we need to check this first to get taint working in similar in all cloudproviders
 				// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
 				// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
+
 				shutdown, err := nodectrlutil.ShutdownInCloudProvider(context.TODO(), cnc.cloud, node)
 				if err != nil {
 					glog.Errorf("Error checking if node %s is shutdown: %v", node.Name, err)
@@ -266,12 +273,31 @@ func (cnc *CloudNodeController) MonitorNode() {
 						glog.Errorf("Error patching node taints: %v", err)
 					}
 					// Continue checking the remaining nodes since the current one is shutdown.
+
+				exists, err := instances.InstanceShutdownByProviderID(context.TODO(), node.Spec.ProviderID)
+				if err != nil && err != cloudprovider.NotImplemented {
+					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+					continue
+				}
+
+				if exists {
+					// if node is shutdown add shutdown taint
+					err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, ShutDownTaint)
+					if err != nil {
+						glog.Errorf("Error patching node taints: %v", err)
+					}
+					// Continue checking the remaining nodes since the current one is fine.
+>>>>>>> add node shutdown taint
 					continue
 				}
 
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
+<<<<<<< HEAD
 				exists, err := ensureNodeExistsByProviderID(instances, node)
+=======
+				exists, err = ensureNodeExistsByProviderIDOrExternalID(instances, node)
+>>>>>>> add node shutdown taint
 				if err != nil {
 					glog.Errorf("Error checking if node %s exists: %v", node.Name, err)
 					continue
@@ -303,7 +329,11 @@ func (cnc *CloudNodeController) MonitorNode() {
 
 			} else {
 				// if taint exist remove taint
+<<<<<<< HEAD
 				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, controller.ShutdownTaint)
+=======
+				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, ShutDownTaint)
+>>>>>>> add node shutdown taint
 				if err != nil {
 					glog.Errorf("Error patching node taints: %v", err)
 				}
