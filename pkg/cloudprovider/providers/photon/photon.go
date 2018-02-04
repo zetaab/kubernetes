@@ -476,6 +476,11 @@ func (pc *PCCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	return false, cloudprovider.NotImplemented
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (pc *PCCloud) InstanceShutdownByProviderID(providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	name := string(nodeName)

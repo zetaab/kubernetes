@@ -186,6 +186,11 @@ func (gce *GCECloud) InstanceExistsByProviderID(providerID string) (bool, error)
 	return true, nil
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (gce *GCECloud) InstanceShutdownByProviderID(providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (gce *GCECloud) InstanceID(nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)

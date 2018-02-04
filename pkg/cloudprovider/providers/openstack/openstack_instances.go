@@ -137,6 +137,11 @@ func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) 
 	return true, nil
 }
 
+// InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
+func (i *Instances) InstanceShutdownByProviderID(providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {
