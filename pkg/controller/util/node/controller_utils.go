@@ -194,10 +194,14 @@ func ShutdownInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeN
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
-	providerID, err := cloudprovider.GetInstanceProviderID(context.TODO(), cloud, nodeName)
+	instanceID, err := instances.ExternalID(context.TODO(), nodeName)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
 		return false, err
 	}
+	providerID := cloud.ProviderName() + "://" + instanceID
 	shutdown, err := instances.InstanceShutdownByProviderID(context.TODO(), providerID)
 	return shutdown, err
 }
