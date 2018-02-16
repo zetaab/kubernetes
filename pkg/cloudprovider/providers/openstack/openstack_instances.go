@@ -111,7 +111,7 @@ func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID st
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name, true)
+	srv, err := getServerByName(i.compute, name, false)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", cloudprovider.InstanceNotFound
