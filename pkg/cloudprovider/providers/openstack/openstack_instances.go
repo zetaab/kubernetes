@@ -38,7 +38,7 @@ type Instances struct {
 
 const (
 	instanceShutoff = "SHUTOFF"
-	instanceExist   = "ACTIVE"
+	instanceActive  = "ACTIVE"
 )
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -167,7 +167,7 @@ func (i *Instances) InstanceStateByNodeObj(ctx context.Context, node *v1.Node) (
 	// SHUTOFF is the only state where we can detach volumes immediately
 	if server.Status == instanceShutoff {
 		return cloudprovider.InstanceShutdown, nil
-	} else if server.Status == instanceExist {
+	} else if server.Status == instanceActive {
 		return cloudprovider.InstanceExist, nil
 	}
 	// otherwise remove the node
