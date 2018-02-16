@@ -38,6 +38,7 @@ type Instances struct {
 
 const (
 	instanceShutoff = "SHUTOFF"
+	instanceExist   = "ACTIVE"
 )
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -157,6 +158,7 @@ func (i *Instances) InstanceStateByNodeObj(ctx context.Context, node *v1.Node) (
 	server, err := servers.Get(i.compute, instanceID).Extract()
 	if err != nil {
 		if isNotFound(err) {
+			// remove node if not found from cloudprovider
 			return cloudprovider.InstanceShouldRemove, nil
 		}
 		return "", err
@@ -165,8 +167,11 @@ func (i *Instances) InstanceStateByNodeObj(ctx context.Context, node *v1.Node) (
 	// SHUTOFF is the only state where we can detach volumes immediately
 	if server.Status == instanceShutoff {
 		return cloudprovider.InstanceShutdown, nil
+	} else if server.Status == instanceExist {
+		return cloudprovider.InstanceExist, nil
 	}
-	return cloudprovider.InstanceExist, nil
+	// otherwise remove the node
+	return cloudprovider.InstanceShouldRemove, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
