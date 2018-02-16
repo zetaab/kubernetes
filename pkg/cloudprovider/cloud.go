@@ -148,8 +148,10 @@ type Instances interface {
 	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
-	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
-	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceStateByNodeObj returns string InstanceShutdown or InstanceExist or InstanceShouldRemove
+	// InstanceExist means that instance exists, ie no action needed. Shutdown means that instance is shutdown, 
+	// it is safe to detach volumes. InstanceShouldRemove means that instance does not exist anymore in cloudprovider
+	InstanceStateByNodeObj(ctx context.Context, node *v1.Node) (string, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -184,6 +186,8 @@ var (
 	InstanceNotFound = errors.New("instance not found")
 	DiskNotFound     = errors.New("disk is not found")
 	NotImplemented   = errors.New("unimplemented")
+	InstanceShutdown = "instanceshutdown"
+	InstanceShouldRemove  = "instanceshouldremove"
 )
 
 // Zone represents the location of a particular machine.

@@ -247,16 +247,14 @@ func (cnc *CloudNodeController) MonitorNode() {
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
 		if currentReadyCondition != nil {
 			if currentReadyCondition.Status != v1.ConditionTrue {
-				// we need to check this first to get taint working in similar in all cloudproviders
-				// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
-				// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
-				exists, err := instances.InstanceShutdownByProviderID(context.TODO(), node.Spec.ProviderID)
+				exists := true
+				state, err := instances.InstanceStateByNodeObj(context.TODO(), node)
 				if err != nil && err != cloudprovider.NotImplemented {
 					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
 					continue
 				}
 
-				if exists {
+				if state == cloudprovider.InstanceShutdown {
 					// if node is shutdown add shutdown taint
 					err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, ShutDownTaint)
 					if err != nil {
@@ -264,14 +262,22 @@ func (cnc *CloudNodeController) MonitorNode() {
 					}
 					// Continue checking the remaining nodes since the current one is fine.
 					continue
+				} else if state == cloudprovider.InstanceShouldRemove {
+					// by setting this false node is going to be deleted
+					exists = false
+				} else if state == cloudprovider.InstanceExist {
+					continue
 				}
 
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
-				exists, err = ensureNodeExistsByProviderIDOrExternalID(instances, node)
-				if err != nil {
-					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
-					continue
+				// if exists is still true lets recheck this, we need this for backward compatibility
+				if exists {
+					exists, err = ensureNodeExistsByProviderIDOrExternalID(instances, node)
+					if err != nil {
+						glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+						continue
+					}
 				}
 
 				if exists {

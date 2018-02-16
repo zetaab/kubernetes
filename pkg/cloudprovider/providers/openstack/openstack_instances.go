@@ -36,6 +36,10 @@ type Instances struct {
 	opts    MetadataOpts
 }
 
+const (
+	instanceShutoff = "SHUTOFF"
+)
+
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("openstack.Instances() called")
@@ -107,7 +111,7 @@ func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID st
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name, true)
+	srv, err := getServerByName(i.compute, name, false)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", cloudprovider.InstanceNotFound
@@ -141,9 +145,28 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 	return true, nil
 }
 
-// InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
-func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+
+// InstanceStateByNodeObj returns status for cloud or nodelifecycle controller
+// InstanceExist means that instance exists, ie no action needed. Shutdown means that instance is shutdown, 
+// it is safe to detach volumes. InstanceShouldRemove means that instance does not exist anymore in cloudprovider
+func (i *Instances) InstanceStateByNodeObj(ctx context.Context, node *v1.Node) (string, error) {
+	instanceID, err := instanceIDFromProviderID(node.Spec.ProviderID)
+	if err != nil {
+		return "", err
+	}
+	server, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		if isNotFound(err) {
+			return cloudprovider.InstanceShouldRemove, nil
+		}
+		return "", err
+	}
+
+	// SHUTOFF is the only state where we can detach volumes immediately
+	if server.Status == instanceShutoff {
+		return cloudprovider.InstanceShutdown, nil
+	}
+	return cloudprovider.InstanceExist, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
