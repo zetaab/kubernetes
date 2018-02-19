@@ -214,7 +214,7 @@ func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name, true)
+	srv, err := getServerByName(i.compute, name, false)
 
 	if err != nil {
 		return "", err

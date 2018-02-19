@@ -504,7 +504,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 }
 
 func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]v1.NodeAddress, error) {
-	srv, err := getServerByName(client, name, true)
+	srv, err := getServerByName(client, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -666,7 +666,7 @@ func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeN
 		return cloudprovider.Zone{}, err
 	}
 
-	srv, err := getServerByName(compute, nodeName, true)
+	srv, err := getServerByName(compute, nodeName, false)
 	if err != nil {
 		if err == ErrNotFound {
 			return cloudprovider.Zone{}, cloudprovider.InstanceNotFound
