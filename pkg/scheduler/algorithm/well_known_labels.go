@@ -61,4 +61,7 @@ const (
 	// from the cloud-controller-manager intitializes this node, and then removes
 	// the taint
 	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
+
+	// TaintNodeSuspended when node is suspended in cloud provider
+	TaintNodeSuspended = "node.cloudprovider.kubernetes.io/suspended"
 )

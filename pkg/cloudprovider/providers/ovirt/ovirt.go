@@ -212,6 +212,11 @@ func (v *OVirtCloud) InstanceExistsByProviderID(ctx context.Context, providerID 
 	return false, cloudprovider.NotImplemented
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (v *OVirtCloud) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (v *OVirtCloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	name := mapNodeNameToInstanceName(nodeName)

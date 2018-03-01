@@ -190,6 +190,11 @@ func (gce *GCECloud) InstanceExistsByProviderID(ctx context.Context, providerID 
 	return true, nil
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (gce *GCECloud) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)

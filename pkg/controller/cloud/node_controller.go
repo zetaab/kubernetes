@@ -37,6 +37,8 @@ import (
 	clientretry "k8s.io/client-go/util/retry"
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
+	nodectrlutil "k8s.io/kubernetes/pkg/controller/util/node"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -240,19 +242,36 @@ func (cnc *CloudNodeController) MonitorNode() {
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
 		if currentReadyCondition != nil {
 			if currentReadyCondition.Status != v1.ConditionTrue {
-				// Check with the cloud provider to see if the node still exists. If it
-				// doesn't, delete the node immediately.
-				exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
-				if err != nil {
-					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
-					continue
-				}
+				state := nodectrlutil.StateInCloudProvider(context.TODO(), cnc.cloud, node)
+				// backwards compatibility, this can be removed after all cloudproviders has implemented InstanceStateByProviderID
+				if state == cloudprovider.NodeNotImplemented {
+					// Check with the cloud provider to see if the node still exists. If it
+					// doesn't, delete the node immediately.
+					exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+					if err != nil {
+						glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+						continue
+					}
 
-				if exists {
-					// Continue checking the remaining nodes since the current one is fine.
-					continue
+					if exists {
+						// Continue checking the remaining nodes since the current one is fine.
+						continue
+					}
+					// otherwise instance is in terminated state and will be deleted from cluster
+				} else {
+					if state == cloudprovider.NodeRunning {
+						continue
+					// suspended, add taint
+					} else if state == cloudprovider.NodeSuspended {
+						err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, controller.SuspendedTaint)
+						if err != nil {
+							glog.Errorf("Error patching node taints: %v", err)
+						}
+						// Continue checking the remaining nodes since the current one is suspended.
+						continue
+					}
+					// otherwise instance is in terminated state and will be deleted from cluster
 				}
-
 				glog.V(2).Infof("Deleting node since it is no longer present in cloud provider: %s", node.Name)
 
 				ref := &v1.ObjectReference{
@@ -272,6 +291,12 @@ func (cnc *CloudNodeController) MonitorNode() {
 					}
 				}(node.Name)
 
+			} else {
+				// if taint exist remove taint
+				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, controller.SuspendedTaint)
+				if err != nil {
+					glog.Errorf("Error patching node taints: %v", err)
+				}
 			}
 		}
 	}

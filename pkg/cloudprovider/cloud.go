@@ -148,6 +148,11 @@ type Instances interface {
 	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated
+	// if unexpected error happens, Running state and error should be returned. Suspended is state where volumes can be
+	// detached without waiting. Terminated means that instance is not coming back, and node is deleted from cluster
+	InstanceStateByProviderID(ctx context.Context, providerID string) (int, error)
+
 }
 
 // Route is a representation of an advanced routing rule.
@@ -182,6 +187,13 @@ var (
 	InstanceNotFound = errors.New("instance not found")
 	DiskNotFound     = errors.New("disk is not found")
 	NotImplemented   = errors.New("unimplemented")
+)
+
+const (
+	NodeNotImplemented = 0
+	NodeRunning        = 1
+	NodeSuspended      = 2
+	NodeTerminated     = 3
 )
 
 // Zone represents the location of a particular machine.

@@ -141,6 +141,11 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 	return true, nil
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (i *Instances) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {

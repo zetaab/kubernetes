@@ -584,6 +584,11 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 	return false, err
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (vs *VSphere) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
 

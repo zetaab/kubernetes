@@ -1338,6 +1338,11 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	return true, nil
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (c *Cloud) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
 func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:

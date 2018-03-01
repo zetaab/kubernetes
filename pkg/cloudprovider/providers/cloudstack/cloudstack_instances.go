@@ -158,3 +158,8 @@ func (cs *CSCloud) InstanceExistsByProviderID(ctx context.Context, providerID st
 
 	return true, nil
 }
+
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (cs *CSCloud) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}

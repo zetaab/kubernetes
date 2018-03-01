@@ -77,6 +77,11 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 	return true, nil
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (az *Cloud) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {

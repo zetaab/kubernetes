@@ -477,6 +477,11 @@ func (pc *PCCloud) InstanceExistsByProviderID(ctx context.Context, providerID st
 	return false, cloudprovider.NotImplemented
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (pc *PCCloud) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (pc *PCCloud) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
 	name := string(nodeName)

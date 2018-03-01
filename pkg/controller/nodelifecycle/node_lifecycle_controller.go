@@ -51,6 +51,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -154,6 +155,7 @@ type Controller struct {
 	nodeLister                corelisters.NodeLister
 	nodeInformerSynced        cache.InformerSynced
 	nodeExistsInCloudProvider func(types.NodeName) (bool, error)
+	nodeStateInCloudProvider  func(context.Context, *v1.Node) int
 
 	recorder record.EventRecorder
 
@@ -238,6 +240,9 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		nodeStatusMap: make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+		},
+		nodeStateInCloudProvider: func(ctx context.Context, node *v1.Node) int {
+			return nodeutil.StateInCloudProvider(ctx, cloud, node)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -653,6 +658,11 @@ func (nc *Controller) monitorNodeStatus() error {
 						glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 					}
 				}
+				// remove shutdown taint this is needed always depending do we use taintbased or not
+				err := nc.markNodeAsNotSuspended(node)
+				if err != nil {
+					glog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+				}
 			}
 
 			// Report node event.
@@ -666,24 +676,46 @@ func (nc *Controller) monitorNodeStatus() error {
 			// Check with the cloud provider to see if the node still exists. If it
 			// doesn't, delete the node immediately.
 			if currentReadyCondition.Status != v1.ConditionTrue && nc.cloud != nil {
-				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
-				if err != nil {
-					glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
-					continue
-				}
-				if !exists {
-					glog.V(2).Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
-					nodeutil.RecordNodeEvent(nc.recorder, node.Name, string(node.UID), v1.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
-					go func(nodeName string) {
-						defer utilruntime.HandleCrash()
-						// Kubelet is not reporting and Cloud Provider says node
-						// is gone. Delete it without worrying about grace
-						// periods.
-						if err := nodeutil.ForcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
-							glog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
+				state := nc.nodeStateInCloudProvider(context.TODO(), node)
+				// backwards compatibility, this can be removed after all cloudproviders has implemented InstanceStateByProviderID
+				if state == cloudprovider.NodeNotImplemented {
+					// Check with the cloud provider to see if the node still exists. If it
+					// doesn't, delete the node immediately.
+					exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
+					if err != nil {
+						glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
+						continue
+					}
+
+					if exists {
+						// Continue checking the remaining nodes since the current one is fine.
+						continue
+					}
+					// otherwise instance is in terminated state and will be deleted from cluster
+				} else {
+					if state == cloudprovider.NodeRunning {
+						continue
+					// suspended, add taint
+					} else if state == cloudprovider.NodeSuspended {
+						err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, node.Name, controller.SuspendedTaint)
+						if err != nil {
+							glog.Errorf("Error patching node taints: %v", err)
 						}
-					}(node.Name)
+						continue
+					}
+					// otherwise instance is in terminated state and will be deleted from cluster
 				}
+				glog.V(2).Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
+				nodeutil.RecordNodeEvent(nc.recorder, node.Name, string(node.UID), v1.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
+				go func(nodeName string) {
+					defer utilruntime.HandleCrash()
+					// Kubelet is not reporting and Cloud Provider says node
+					// is gone. Delete it without worrying about grace
+					// periods.
+					if err := nodeutil.ForcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
+						glog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
+					}
+				}(node.Name)
 			}
 		}
 	}
@@ -1100,6 +1132,17 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		return false, err
 	}
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+}
+
+func (nc *Controller) markNodeAsNotSuspended(node *v1.Node) error {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, controller.SuspendedTaint)
+	if err != nil {
+		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
+		return err
+	}
+	return nil
 }
 
 // ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.

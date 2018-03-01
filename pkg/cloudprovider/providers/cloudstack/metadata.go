@@ -119,6 +119,11 @@ func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID st
 	return false, errors.New("InstanceExistsByProviderID not implemented")
 }
 
+// InstanceStateByProviderID returns current state of instance. Possible values Running, Suspended, Terminated and NotImplemented
+func (m *metadata) InstanceStateByProviderID(ctx context.Context, providerID string) (int, error) {
+	return cloudprovider.NodeNotImplemented, nil
+}
+
 // GetZone returns the Zone containing the region that the program is running in.
 func (m *metadata) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	zone := cloudprovider.Zone{}

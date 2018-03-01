@@ -187,6 +187,21 @@ func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeNam
 	return true, nil
 }
 
+
+// StateInCloudProvider returns instance state in cloudprovider
+func StateInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) int {
+	instances, ok := cloud.Instances()
+	if !ok {
+		return cloudprovider.NodeNotImplemented
+	}
+	state, err := instances.InstanceStateByProviderID(ctx, node.Spec.ProviderID)
+	if err != nil {
+		glog.Warningf("Error while retrieving instance state: %v", err)
+	}
+	return state
+}
+
+
 // RecordNodeEvent records a event related to a node.
 func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &v1.ObjectReference{
