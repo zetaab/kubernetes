@@ -47,6 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -734,9 +736,15 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 			keepTerminatedPodVolumes = (t == "true")
 		}
 
+		shutdownTaint := &v1.Taint{
+			Key:    algorithm.TaintNodeShutdown,
+			Effect: v1.TaintEffectNoSchedule,
+		}
+
+		isShutdownNode := taints.TaintExists(node.Spec.Taints, shutdownTaint)
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes, isShutdownNode)
 	}
 }
 

@@ -177,7 +177,7 @@ func (rc *reconciler) reconcile() {
 	// Ensure volumes that should be detached are detached.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
 		if !rc.desiredStateOfWorld.VolumeExists(
-			attachedVolume.VolumeName, attachedVolume.NodeName) {
+			attachedVolume.VolumeName, attachedVolume.NodeName) || rc.desiredStateOfWorld.NodeIsShutdown(attachedVolume.NodeName) {
 
 			// Don't even try to start an operation if there is already one running
 			// This check must be done before we do any other checks, as otherwise the other checks
@@ -196,8 +196,14 @@ func (rc *reconciler) reconcile() {
 			}
 			// Check whether timeout has reached the maximum waiting time
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
-			if attachedVolume.MountedByNode && !timeout {
+			isShutdownNode := rc.desiredStateOfWorld.NodeIsShutdown(attachedVolume.NodeName)
+
+			safe := false
+			if timeout || isShutdownNode {
+				safe = true
+			}
+			// Check whether volume is still mounted. Skip detach if it is still mounted unless safe
+			if attachedVolume.MountedByNode && !safe {
 				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
 				continue
 			}
@@ -221,12 +227,13 @@ func (rc *reconciler) reconcile() {
 			}
 
 			// Trigger detach volume which requires verifing safe to detach step
-			// If timeout is true, skip verifySafeToDetach check
+			// If safe is true, skip verifySafeToDetach check
 			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
-			verifySafeToDetach := !timeout
+			verifySafeToDetach := !safe
+
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
-				if !timeout {
+				if !safe {
 					glog.Infof(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", ""))
 				} else {
 					metrics.RecordForcedDetachMetric()
